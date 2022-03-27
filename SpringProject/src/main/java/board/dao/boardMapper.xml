@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="boardSQL">
+	<insert id="boardWrite" parameterType="java.util.Map" >
+		INSERT INTO board(seq
+						, id
+						, name
+						, email
+						, subject
+						, content
+						, ref)
+						VALUES(seq_board.nextval
+							, #{id}
+							, #{name}
+							, #{email}
+							, #{subject}
+							, #{content}
+							, seq_board.currval)
+	</insert>
+	
+	<!-- 목록 -->
+	<select id="getBoardList" parameterType="java.util.Map" resultType="board">
+		<!-- 
+		SELECT * FROM 
+		(SELECT ROWNUM rn, tt.* FROM
+		(SELECT seq, id, name, email, subject, content,
+				ref, lev, step, pseq, reply, hit,
+		        TO_CHAR(logtime, 'yyyy.mm.dd') AS logtime FROM board ORDER BY REF DESC, STEP ASC)tt)
+		WHERE rn BETWEEN #{startNum} AND #{endNum}
+		 -->
+		
+		SELECT * FROM 
+		(SELECT ROWNUM rn, tt.* FROM
+		(SELECT * FROM board ORDER BY REF DESC, STEP ASC)tt)
+		WHERE rn BETWEEN #{startNum} AND #{endNum}
+		
+	</select>
+	
+	<!-- 1개의 글보기 -->
+	<select id="getBoardView" parameterType="int" resultType="board">
+		SELECT * FROM board WHERE seq = #{seq}
+	</select>
+	
+	<!-- 총글수 -->
+	<select id="getTotalA" resultType="int">
+		SELECT count(*) FROM board
+	</select>
+	
+	<select id="getTotalSearchA" parameterType="java.util.Map" resultType="int">
+		SELECT count(*) FROM board WHERE ${searchOption} LIKE '%' || #{keyword} || '%'
+	</select>
+	
+	<!-- 글 수정 -->
+	<update id="boardModify" parameterType="java.util.Map">
+		UPDATE board SET subject = #{subject}, content = #{content} WHERE seq = #{seq}
+	</update>
+	
+	<!-- 답글 -->
+	<insert id="boardReply" parameterType="java.util.Map">
+		BEGIN
+			UPDATE board SET step = step + 1 WHERE ref = #{ref} AND step > #{step};
+			INSERT INTO board VALUES(seq_board.nextval
+									, #{id}
+									, #{name}
+									, #{email}
+									, #{subject}
+									, #{content}
+									, #{ref}
+									, #{lev} + 1
+									, #{step} + 1
+									, #{pseq}
+									, 0
+									, 0
+									, sysdate);
+			UPDATE board SET reply = reply+1 WHERE seq = #{pseq};
+		END;
+	</insert>
+	<delete id="boardDelete" parameterType="int">
+		begin					<!-- 01/19 1028 -->
+			UPDATE board SET reply = reply - 1 WHERE seq = (SELECT pseq FROM board WHERE seq = 20);
+			UPDATE board SET subject = '[원글이 삭제된 답글]' || subject WHERE pseq = 20;
+			DELETE FROM board WHERE seq = #{seq};
+		end;
+	</delete>
+	
+	<select id="getBoardSearchList" parameterType="java.util.Map" resultType="board">
+		SELECT * FROM 
+		(SELECT ROWNUM rn, tt.* FROM
+		(SELECT * FROM board 
+		        WHERE ${searchOption} LIKE '%' || #{keyword} || '%'
+		        ORDER BY REF DESC, STEP ASC)tt)
+		WHERE rn BETWEEN #{startNum} AND #{endNum} 
+	</select>
+	
+	
+</mapper>
